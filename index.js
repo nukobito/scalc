@@ -284,9 +284,11 @@ class VM {
         this.stack = [];
     }
     run( codes ) {
-        let a, b, result;
+        let result;
         for ( let code of codes ) {
+            result = undefined;
             let [ m, o ] = code.split( ' ' );
+            let a, b;
             switch ( m ) {
                 case 'pushi':
                     a = this.address.findIndex( ( e ) => {
