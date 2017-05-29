@@ -13,6 +13,7 @@ const Kind = {
     Asterisk: '*'.charCodeAt( 0 ),
     Slash: '/'.charCodeAt( 0 ),
     Percent: '%'.charCodeAt( 0 ),
+    Caret: '^'.charCodeAt( 0 ),
     Equals: '='.charCodeAt( 0 ),
 
     Semicolon: ';'.charCodeAt( 0 ),
@@ -96,6 +97,7 @@ class Tokenizer {
                     case '*': this._tokens.push( new Token( Kind.Asterisk, '*' ) ); break;
                     case '/': this._tokens.push( new Token( Kind.Slash, '/' ) ); break;
                     case '%': this._tokens.push( new Token( Kind.Percent, '%' ) ); break;
+                    case '^': this._tokens.push( new Token( Kind.Caret, '^' ) ); break;
                     case '=': this._tokens.push( new Token( Kind.Equals, '=' ) ); break;
                     case ';': this._tokens.push( new Token( Kind.Semicolon, ';' ) ); break;
                     case '(': this._tokens.push( new Token( Kind.OpenParenthesis, '(' ) ); break;
@@ -188,11 +190,11 @@ class ExpressionNode {
 
 class TermNode {
     parse( tokenizer, codes ) {
-        new FactorNode().parse( tokenizer, codes );
+        new ExponentiationNode().parse( tokenizer, codes );
         let token = tokenizer.peekToken();
         if ( token.kind === Kind.Asterisk || token.kind === Kind.Slash || token.kind === Kind.Percent ) {
             tokenizer.moveNextToken();
-            new FactorNode().parse( tokenizer, codes );
+            new ExponentiationNode().parse( tokenizer, codes );
             if ( token.kind === Kind.Asterisk ) {
                 codes.push( 'mul' );
             }
@@ -202,6 +204,18 @@ class TermNode {
             else {
                 codes.push( 'mod' );
             }
+        }
+    }
+}
+
+class ExponentiationNode {
+    parse( tokenizer, codes ) {
+        new FactorNode().parse( tokenizer, codes );
+        let token = tokenizer.peekToken();
+        if ( token.kind === Kind.Caret ) {
+            tokenizer.moveNextToken();
+            new FactorNode().parse( tokenizer, codes );
+            codes.push( 'exp' );
         }
     }
 }
@@ -321,6 +335,11 @@ class VM {
                     a = this.stack.pop();
                     b = this.stack.pop();
                     this.stack.push( b % a );
+                    break;
+                case 'exp':
+                    a = this.stack.pop();
+                    b = this.stack.pop();
+                    this.stack.push( Math.pow( b, a ) );
                     break;
             }
         }
