@@ -298,7 +298,7 @@ class VM {
                     this.stack.push( a );
                     break;
                 case 'pushv':
-                    a = parseInt( o, 10 );
+                    a = parseFloat( o, 10 );
                     this.stack.push( a );
                     break;
                 case 'store':
