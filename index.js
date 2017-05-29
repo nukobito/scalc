@@ -12,6 +12,7 @@ const Kind = {
     Hyphen: '-'.charCodeAt( 0 ),
     Asterisk: '*'.charCodeAt( 0 ),
     Slash: '/'.charCodeAt( 0 ),
+    Percent: '%'.charCodeAt( 0 ),
     Equals: '='.charCodeAt( 0 ),
 
     Semicolon: ';'.charCodeAt( 0 ),
@@ -94,6 +95,7 @@ class Tokenizer {
                     case '-': this._tokens.push( new Token( Kind.Hyphen, '-' ) ); break;
                     case '*': this._tokens.push( new Token( Kind.Asterisk, '*' ) ); break;
                     case '/': this._tokens.push( new Token( Kind.Slash, '/' ) ); break;
+                    case '%': this._tokens.push( new Token( Kind.Percent, '%' ) ); break;
                     case '=': this._tokens.push( new Token( Kind.Equals, '=' ) ); break;
                     case ';': this._tokens.push( new Token( Kind.Semicolon, ';' ) ); break;
                     case '(': this._tokens.push( new Token( Kind.OpenParenthesis, '(' ) ); break;
@@ -188,14 +190,17 @@ class TermNode {
     parse( tokenizer, codes ) {
         new FactorNode().parse( tokenizer, codes );
         let token = tokenizer.peekToken();
-        if ( token.kind === Kind.Asterisk || token.kind === Kind.Slash ) {
+        if ( token.kind === Kind.Asterisk || token.kind === Kind.Slash || token.kind === Kind.Percent ) {
             tokenizer.moveNextToken();
             new FactorNode().parse( tokenizer, codes );
             if ( token.kind === Kind.Asterisk ) {
                 codes.push( 'mul' );
             }
-            else {
+            else if ( token.kind === Kind.Slash ) {
                 codes.push( 'div' );
+            }
+            else {
+                codes.push( 'mod' );
             }
         }
     }
@@ -235,7 +240,7 @@ class IdentiferNode {
         if ( token.kind !== Kind.Identifer ) {
             throw new ParseError( token.value, '<identifer>' );
         }
-        let identifer = token.value;    // TODO: This!
+        let identifer = token.value;
         tokenizer.moveNextToken();
         codes.push( 'pushi ' + identifer );
     }
@@ -252,7 +257,7 @@ class ValueNode {
             sign = -1;
             tokenizer.moveNextToken();
         }
-        let value = tokenizer.peekToken().value * sign;     // TODO: This!
+        let value = tokenizer.peekToken().value * sign;
         tokenizer.moveNextToken();
         codes.push( 'pushv ' + value );
     }
@@ -311,6 +316,11 @@ class VM {
                     a = this.stack.pop();
                     b = this.stack.pop();
                     this.stack.push( b / a );
+                    break;
+                case 'mod':
+                    a = this.stack.pop();
+                    b = this.stack.pop();
+                    this.stack.push( b % a );
                     break;
             }
         }
