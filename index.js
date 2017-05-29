@@ -142,16 +142,16 @@ class Tokenizer {
 }
 
 class BlockNode {
-    parse( tokenizer ) {
+    parse( tokenizer, codes ) {
         while ( tokenizer.peekToken().kind !== Kind.Empty ) {
-            new StatementNode().parse( tokenizer );
+            new StatementNode().parse( tokenizer, codes );
         }
     }
 }
 
 class StatementNode {
-    parse( tokenizer ) {
-        new ExpressionNode().parse( tokenizer );
+    parse( tokenizer, codes ) {
+        new ExpressionNode().parse( tokenizer, codes );
         if ( tokenizer.peekToken().kind !== Kind.Semicolon ) {
             throw new ParseError( tokenizer.peekToken().value, ';' );
         }
@@ -160,24 +160,24 @@ class StatementNode {
 }
 
 class ExpressionNode {
-    parse( tokenizer ) {
+    parse( tokenizer, codes ) {
         if ( tokenizer.peekToken().kind === Kind.Identifer && tokenizer.peekToken( 1 ).kind === Kind.Equals ) {
-            new IdentiferNode().parse( tokenizer );
+            new IdentiferNode().parse( tokenizer, codes );
             tokenizer.moveNextToken();
-            new ExpressionNode().parse( tokenizer );
-            console.log( 'code: store' );
+            new ExpressionNode().parse( tokenizer, codes );
+            codes.push( 'store' );
         }
         else {
-            new TermNode().parse( tokenizer );
+            new TermNode().parse( tokenizer, codes );
             let token = tokenizer.peekToken();
             if ( token.kind === Kind.Plus || token.kind === Kind.Hyphen ) {
                 tokenizer.moveNextToken();
-                new TermNode().parse( tokenizer );
+                new TermNode().parse( tokenizer, codes );
                 if ( token.kind === Kind.Plus ) {
-                    console.log( 'code: add' );
+                    codes.push( 'add' );
                 }
                 else {
-                    console.log( 'code: sub' );
+                    codes.push( 'sub' );
                 }
             }
         }
@@ -185,29 +185,29 @@ class ExpressionNode {
 }
 
 class TermNode {
-    parse( tokenizer ) {
-        new FactorNode().parse( tokenizer );
+    parse( tokenizer, codes ) {
+        new FactorNode().parse( tokenizer, codes );
         let token = tokenizer.peekToken();
         if ( token.kind === Kind.Asterisk || token.kind === Kind.Slash ) {
             tokenizer.moveNextToken();
-            new FactorNode().parse( tokenizer );
+            new FactorNode().parse( tokenizer, codes );
             if ( token.kind === Kind.Asterisk ) {
-                console.log( 'code: mul')
+                codes.push( 'mul' );
             }
             else {
-                console.log( 'code: div')
+                codes.push( 'div' );
             }
         }
     }
 }
 
 class FactorNode {
-    parse( tokenizer ) {
+    parse( tokenizer, codes ) {
         let token = tokenizer.peekToken();
         switch ( token.kind ) {
             case Kind.OpenParenthesis:
                 tokenizer.moveNextToken();
-                new ExpressionNode().parse( tokenizer );
+                new ExpressionNode().parse( tokenizer, codes );
                 token = tokenizer.peekToken();
                 if ( token.kind !== Kind.CloseParenthesis ) {
                     throw new ParseError( token.value, ')' );
@@ -215,12 +215,12 @@ class FactorNode {
                 tokenizer.moveNextToken();
                 break;
             case Kind.Identifer:
-                new IdentiferNode().parse( tokenizer );
-                console.log( 'code: load' );
+                new IdentiferNode().parse( tokenizer, codes );
+                codes.push( 'load' );
                 break;
             case Kind.Hyphen:
             case Kind.Value:
-                new ValueNode().parse( tokenizer );
+                new ValueNode().parse( tokenizer, codes );
                 break;
 
             default:
@@ -230,19 +230,19 @@ class FactorNode {
 }
 
 class IdentiferNode {
-    parse( tokenizer ) {
+    parse( tokenizer, codes ) {
         let token = tokenizer.peekToken();
         if ( token.kind !== Kind.Identifer ) {
             throw new ParseError( token.value, '<identifer>' );
         }
         let identifer = token.value;    // TODO: This!
         tokenizer.moveNextToken();
-        console.log( 'code: push &' + identifer );
+        codes.push( 'pushi ' + identifer );
     }
 }
 
 class ValueNode {
-    parse( tokenizer ) {
+    parse( tokenizer, codes ) {
         let sign = 1;
         let token = tokenizer.peekToken();
         if ( !(token.kind === Kind.Hyphen || token.kind === Kind.Value) ) {
@@ -254,16 +254,77 @@ class ValueNode {
         }
         let value = tokenizer.peekToken().value * sign;     // TODO: This!
         tokenizer.moveNextToken();
-        console.log( 'code: push ' + value );
+        codes.push( 'pushv ' + value );
     }
 }
 
+class VM {
+    constructor() {
+        this.address = [];
+        this.memory = [];
+        this.stack = [];
+    }
+    run( codes ) {
+        let a, b, result;
+        for ( let code of codes ) {
+            let [ m, o ] = code.split( ' ' );
+            switch ( m ) {
+                case 'pushi':
+                    a = this.address.findIndex( ( e ) => {
+                        return e === o;
+                    } );
+                    if ( a === -1 ) {
+                        a = this.address.push( o ) - 1;
+                    }
+                    this.stack.push( a );
+                    break;
+                case 'pushv':
+                    a = parseInt( o, 10 );
+                    this.stack.push( a );
+                    break;
+                case 'store':
+                    a = this.stack.pop();
+                    b = this.stack.pop();
+                    this.memory[ b ] = a;
+                    result = a;
+                    break;
+                case 'load':
+                    a = this.stack.pop();
+                    this.stack.push( this.memory[ a ] );
+                    break;
+                case 'add':
+                    a = this.stack.pop();
+                    b = this.stack.pop();
+                    this.stack.push( b + a );
+                    break;
+                case 'sub':
+                    a = this.stack.pop();
+                    b = this.stack.pop();
+                    this.stack.push( b - a );
+                    break;
+                case 'mul':
+                    a = this.stack.pop();
+                    b = this.stack.pop();
+                    this.stack.push( b * a );
+                    break;
+                case 'div':
+                    a = this.stack.pop();
+                    b = this.stack.pop();
+                    this.stack.push( b / a );
+                    break;
+            }
+        }
+        return result === undefined ? this.stack[ 0 ] : result;
+    }
+}
 
-
-
-
-
-
-
-let tokenizer = new Tokenizer( 'hp=10; damage=5; hp/damage+(1.25*2);' );
-new BlockNode().parse( tokenizer );
+// ========================================================
+//      Entry point.
+// --------------------------------------------------------
+let arg = process.argv[ 2 ];
+if ( arg !== undefined ) {
+    let tokenizer = new Tokenizer( arg );
+    let codes = [];
+    new BlockNode().parse( tokenizer, codes );
+    console.log( new VM().run( codes ) );
+}
